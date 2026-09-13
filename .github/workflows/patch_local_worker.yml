@@ -1,0 +1,47 @@
+name: 自动给本地 _worker.js 打测速拦截补丁
+
+on:
+  push:
+    paths:
+      - '_worker.js' # 只要 _worker.js 被修改提交（包括上游自动同步推过来的新代码），立刻触发
+  workflow_dispatch:  # 同时也保留手动点击触发按钮
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出当前仓库
+        uses: actions/checkout@v4
+
+      - name: 执行正则补丁脚本
+        run: |
+          python3 -c "
+          import re
+
+          with open('_worker.js', 'r', encoding='utf-8') as f:
+              content = f.read()
+
+          # 1. 精确匹配单参数调用 isSpeedTestSite(hostname) 并替换为 isSpeedTestSite(hostname, port)
+          content = re.sub(r'\bisSpeedTestSite\(\s*hostname\s*\)', 'isSpeedTestSite(hostname, port)', content)
+
+          # 2. 修改函数定义，在第一行引入 80 端口拦截逻辑
+          def_pattern = r'function\s+isSpeedTestSite\(\s*hostname\s*\)\s*\{'
+          def_replace = 'function isSpeedTestSite(hostname, port) {\n\tif (port != 80) return false;'
+          content = re.sub(def_pattern, def_replace, content)
+
+          with open('_worker.js', 'w', encoding='utf-8') as f:
+              f.write(content)
+          "
+
+      - name: 提交并推送修改
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          if [ -n "$(git status --porcelain)" ]; then
+            git add _worker.js
+            git commit -m "style: 自动对 _worker.js 应用 80 端口测速拦截补丁 [skip ci]"
+            git push
+          else
+            echo "代码已是补丁后的状态，无需重复提交。"
+          fi
