@@ -30,12 +30,14 @@ jobs:
 
           # 2. 匹配并直接覆盖整个 isSpeedTestSite 函数体，确保包含 80 端口校验
           func_pattern = r'function\s+isSpeedTestSite\s*\([^)]*\)\s*\{[\s\S]*?\}'
-          func_replace = '''function isSpeedTestSite(hostname, port) {
-	if (port != 80 || !hostname) return false;
-	const speedTestDomains = ['speed.cloudflare.com', 'cp.cloudflare.com'];
-	hostname = hostname.toLowerCase();
-	return speedTestDomains.some(domain => hostname === domain || hostname.endsWith('.' + domain));
-}'''
+          func_replace = (
+              'function isSpeedTestSite(hostname, port) {\n'
+              '	if (port != 80 || !hostname) return false;\n'
+              '	const speedTestDomains = [\'speed.cloudflare.com\', \'cp.cloudflare.com\'];\n'
+              '	hostname = hostname.toLowerCase();\n'
+              '	return speedTestDomains.some(domain => hostname === domain || hostname.endsWith(\'.\' + domain));\n'
+              '}'
+          )
 
           content = re.sub(func_pattern, func_replace, content)
 
