@@ -1,16 +1,16 @@
-name: 自动给本地 _worker.js 打测速拦截补丁
+name: 手动或推送时自动修补 _worker.js
 
 on:
-  push:
-    paths:
-      - '_worker.js' # 当 _worker.js 被修改提交（如上游同步进来）时触发
-  workflow_dispatch:  # 保留手动触发按钮
+  workflow_dispatch: # 支持你在 Actions 页面手动点“Run workflow”随时执行
+  push:             # 只要仓库有任何 Push 提交就执行（不限制修改了哪个文件）
+    branches:
+      - main        # 如果你的默认分支叫 master，这里改成 master
 
 jobs:
   patch:
     runs-on: ubuntu-latest
     
-    # 关键设置：赋予 GITHUB_TOKEN 写入权限，否则最后 git push 会报 403 错误
+    # 赋予 Action 向仓库提交代码的写权限
     permissions:
       contents: write
 
@@ -18,7 +18,7 @@ jobs:
       - name: 检出当前仓库
         uses: actions/checkout@v4
 
-      - name: 执行正则补丁脚本
+      - name: 读取并修改 _worker.js
         run: |
           python3 -c "
           import re
@@ -26,10 +26,10 @@ jobs:
           with open('_worker.js', 'r', encoding='utf-8') as f:
               content = f.read()
 
-          # 1. 精确匹配单参数调用 isSpeedTestSite(hostname) 并替换为 isSpeedTestSite(hostname, port)
+          # 1. 将所有 isSpeedTestSite(hostname) 替换为 isSpeedTestSite(hostname, port)
           content = re.sub(r'\bisSpeedTestSite\(\s*hostname\s*\)', 'isSpeedTestSite(hostname, port)', content)
 
-          # 2. 修改函数定义，在第一行引入 80 端口拦截逻辑
+          # 2. 修改函数定义，加入 port != 80 判断
           def_pattern = r'function\s+isSpeedTestSite\(\s*hostname\s*\)\s*\{'
           def_replace = 'function isSpeedTestSite(hostname, port) {\n\tif (port != 80) return false;'
           content = re.sub(def_pattern, def_replace, content)
@@ -38,7 +38,7 @@ jobs:
               f.write(content)
           "
 
-      - name: 提交并推送修改
+      - name: 保存修改并推送回仓库
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
@@ -47,6 +47,7 @@ jobs:
             git add _worker.js
             git commit -m "style: 自动对 _worker.js 应用 80 端口测速拦截补丁 [skip ci]"
             git push
+            echo "修改完成，已自动推送到你的仓库！"
           else
-            echo "代码已是补丁后的状态，无需重复提交。"
+            echo "当前 _worker.js 已经是修补后的状态，无需重复提交。"
           fi
