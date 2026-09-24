@@ -1,10 +1,7 @@
-name: 修补 _worker.js 测速拦截逻辑
+name: 拉取 cmliu 最新 _worker.js 并修补测速逻辑
 
 on:
-  workflow_dispatch: # 随时可以在 GitHub Actions 页面手动点击触发
-  push:
-    paths:
-      - '_worker.js' # 只有当 _worker.js 被修改提交时，才自动触发运行
+  workflow_dispatch: # 在 GitHub Actions 页面手动点击触发
 
 jobs:
   patch:
@@ -16,6 +13,10 @@ jobs:
     steps:
       - name: 检出当前仓库
         uses: actions/checkout@v4
+
+      - name: 下载 cmliu 仓库最新 _worker.js
+        run: |
+          curl -sSL https://raw.githubusercontent.com/cmliu/edgetunnel/main/_worker.js -o _worker.js
 
       - name: 强制修补 _worker.js
         run: |
@@ -52,9 +53,9 @@ jobs:
 
           if [ -n "$(git status --porcelain)" ]; then
             git add _worker.js
-            git commit -m "fix: 修复 isSpeedTestSite 函数 80 端口拦截逻辑缺失 [skip ci]"
+            git commit -m "sync: 同步 cmliu 最新 _worker.js 并修复 80 端口测速拦截逻辑 [skip ci]"
             git push
             echo "修改完成，已成功推送到仓库！"
           else
-            echo "代码已是最终正确状态，无需重复提交。"
+            echo "代码与 cmliu 最新版本一致且已成功打补丁，无需重复提交。"
           fi
